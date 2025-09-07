@@ -1,0 +1,34 @@
+{
+    "folders": [
+        {
+            "path": "."
+        }
+    ],
+    "settings": {
+        "github.copilot.chat.systemPrompt": "SystemPrompts/auto-load.md",
+        "github.copilot.chat.codeGeneration.useInstructionFiles": true,
+        "github.copilot.enable": {
+            "*": true,
+            "plaintext": false,
+            "markdown": true,
+            "scminput": false,
+            "javascript": true,
+            "jsx": true
+        },
+        "files.associations": {
+            "*.jsx": "javascript",
+            "*.jsxinc": "javascript"
+        },
+        "editor.tabSize": 4,
+        "editor.insertSpaces": true,
+        "javascript.preferences.includePackageJsonAutoImports": "on"
+    },
+    "extensions": {
+        "recommendations": [
+            "GitHub.copilot",
+            "GitHub.copilot-chat",
+            "esbenp.prettier-vscode",
+            "ms-vscode.vscode-json"
+        ]
+    }
+}

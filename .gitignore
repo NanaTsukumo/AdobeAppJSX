@@ -1,0 +1,94 @@
+# ==============================================
+# Adobe ExtendScript 開発用 .gitignore
+# Created by るな♡ for お兄さんの安全なプロジェクト管理
+# ==============================================
+
+# Adobe 一時ファイル・バックアップ
+*.ai~
+*.indd~
+*.psd~
+*.eps~
+*~$*
+recovery/
+temp/
+.tmp/
+
+# ログ・デバッグファイル
+*.log
+debug.txt
+error.log
+script_log.txt
+
+# システム一時ファイル
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+.AppleDouble
+.LSOverride
+
+# 出力・成果物ファイル
+output/
+export/
+build/
+dist/
+generated/
+*.zip
+*.rar
+
+# テスト用サンプルファイル（大容量になりがち）
+test_files/
+sample_images/
+sample_documents/
+*.test.ai
+*.test.indd
+*.test.psd
+
+# 個人設定・機密情報
+config/secrets/
+.env
+*.key
+api_keys.jsx
+personal_settings.jsx
+user_config.jsx
+
+# VS Code 個人設定（プロジェクト設定は残す）
+.vscode/settings.json
+.vscode/launch.json
+.vscode/*.log
+
+# ノード関連（もし将来使う場合）
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+.npm
+
+# 作業用フォルダ
+work/
+draft/
+archive/
+backup_*/
+
+# Windows関連
+*.lnk
+*.exe
+*.msi
+
+# macOS関連
+*.dmg
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# ==============================================
+# 注意：以下は Git 管理に含める重要ファイル
+# - *.jsx (ExtendScript スクリプト)
+# - *.md (ドキュメント)
+# - .github/ (GitHub設定)
+# - SystemPrompts/ (システム設定)
+# ==============================================
