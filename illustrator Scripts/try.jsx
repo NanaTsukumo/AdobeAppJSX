@@ -1,7 +1,18 @@
-// Illustrator面付け自動化スクリプト v2.0
-// 月代観るな製 - お兄さん専用面付けツール♡
+/**
+ * Illustrator面付け自動化スクリプト
+ * 
+ * @version 0.1.0-alpha.1
+ * @author 月代観るな (Luna Tsukuyomi)  
+ * @license Apache-2.0
+ * @description Adobe Illustrator向けの面付け自動化ツール（開発版）
+ * @requires Adobe Illustrator CC 2020+
+ * @created 2025-09-07
+ * @updated 2025-09-08
+ * @status Alpha - 実験的機能、破壊的変更の可能性あり
+ */
 
 // グローバル変数
+var SCRIPT_VERSION = "0.1.0-alpha.1";
 var PREFERENCES_KEY = "ImpositionScript";
 var progressWindow = null;
 

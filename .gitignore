@@ -54,9 +54,15 @@ api_keys.jsx
 personal_settings.jsx
 user_config.jsx
 
+# 内部資料（非公開）
+ROADMAP_INTERNAL.md
+PRIVATE_*.md
+internal/
+confidential/
+
 # VS Code 個人設定（プロジェクト設定は残す）
 .vscode/settings.json
-.vscode/launch.json
+# .vscode/launch.json  # プロジェクト共有用なのでコメントアウト
 .vscode/*.log
 
 # ノード関連（もし将来使う場合）
