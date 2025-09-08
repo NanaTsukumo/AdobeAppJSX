@@ -22,7 +22,7 @@ Adobe Creative Suite向けの実用的なExtendScriptコレクション。コミ
 
 ### Illustrator Scripts
 
-- **`try.jsx`** - 面付け自動化スクリプト **[ALPHA]**
+- **`自動面付け.jsx`** - 面付け自動化スクリプト **[ALPHA]**
   - 複数行列での自動レイアウト
   - プログレスバー付きの安全な処理
   - 印刷業界標準のトンボ自動生成
@@ -195,14 +195,14 @@ cd AdobeAppJSX
 
 ### 3. スクリプト実行
 **方法1: VS Codeから実行（開発者向け）**
-1. `illustrator Scripts/try.jsx` を開く
+1. `illustrator Scripts/自動面付け.jsx` を開く
 2. `F5` キーでデバッグ実行
 3. Illustratorが自動起動し、スクリプトが実行されます
 
 **方法2: Illustratorから直接実行（エンドユーザー向け）**
 1. Illustratorを起動
 2. `ファイル` → `スクリプト` → `その他のスクリプト...`
-3. `try.jsx` ファイルを選択して実行
+3. `自動面付け.jsx` ファイルを選択して実行
 
 ### 4. トラブルシューティング
 - **スクリプトが実行されない**: Illustratorでスクリプト実行が有効になっているか確認

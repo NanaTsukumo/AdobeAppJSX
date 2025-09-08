@@ -31,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 複数AI技術の活用記録
   - AI-Human Collaboration workflow
 
-- 🎨 **Illustrator面付け自動化スクリプト (try.jsx)** - **ALPHA**
+- 🎨 **Illustrator面付け自動化スクリプト (自動面付け.jsx)** - **ALPHA**
   - 基本的な面付け機能（行列レイアウト）
   - GUI インターフェース実装
   - 設定保存・復元機能
