@@ -31,16 +31,16 @@ function createImpositionGUI() {
     settingsPanel.spacing = 5;
     settingsPanel.margins = 10;
 
-    // 行・列数設定（安全な初期値に変更）
+    // 行・列数設定
     var rowGroup = settingsPanel.add("group");
     rowGroup.add("statictext", undefined, "行数:");
-    var rowInput = rowGroup.add("edittext", undefined, "1");
+    var rowInput = rowGroup.add("edittext", undefined, "2");
     rowInput.characters = 5;
     
-    // 数値のみ入力制限（最大値を下げて安全性向上）
+    // 数値のみ入力制限
     rowInput.onChanging = function() {
         this.text = this.text.replace(/[^0-9]/g, "");
-        if (parseInt(this.text) > 10) this.text = "10"; // 最大10に制限
+        if (parseInt(this.text) > 20) this.text = "20";
     };
 
     var colGroup = settingsPanel.add("group");
@@ -51,7 +51,7 @@ function createImpositionGUI() {
     // 数値のみ入力制限
     colInput.onChanging = function() {
         this.text = this.text.replace(/[^0-9]/g, "");
-        if (parseInt(this.text) > 10) this.text = "10"; // 最大10に制限
+        if (parseInt(this.text) > 20) this.text = "20";
     };
 
     // 間隔設定
@@ -195,18 +195,17 @@ function createImpositionGUI() {
     initializeSettings(rowInput, colInput, spacingInput, paperDropdown, widthInput, heightInput, centerCheck, trimMarkCheck, customGroup);
 
     dialog.show();
-    return true; // GUI表示成功
 }
 
 // 入力バリデーション関数
 function validateInputs(rows, cols, spacing, paperType, width, height) {
     // 行・列数チェック
-    if (!rows || rows === "" || isNaN(parseInt(rows)) || parseInt(rows) <= 0 || parseInt(rows) > 10) {
-        return {valid: false, message: "行数は1〜10の数値で入力してください"};
+    if (!rows || rows === "" || isNaN(parseInt(rows)) || parseInt(rows) <= 0 || parseInt(rows) > 20) {
+        return {valid: false, message: "行数は1〜20の数値で入力してください"};
     }
     
-    if (!cols || cols === "" || isNaN(parseInt(cols)) || parseInt(cols) <= 0 || parseInt(cols) > 10) {
-        return {valid: false, message: "列数は1〜10の数値で入力してください"};
+    if (!cols || cols === "" || isNaN(parseInt(cols)) || parseInt(cols) <= 0 || parseInt(cols) > 20) {
+        return {valid: false, message: "列数は1〜20の数値で入力してください"};
     }
     
     // 間隔チェック
@@ -256,179 +255,178 @@ function executeImposition(rows, cols, spacing, paperSize, centerAlign, addTrimM
         return;
     }
 
-    // ExtendScript互換のUndo履歴管理
+    // Undo用のスナップショット作成
+    app.executeMenuCommand("undo");
+    app.executeMenuCommand("redo"); // これでundo履歴に追加される
+    
     try {
-        // 古い安全な方法: メニューコマンド使用
-        app.executeMenuCommand("undo");
-        app.executeMenuCommand("redo"); // これでundo履歴に追加される
+        var totalObjects = rows * cols;
+        showProgress("面付け処理中...", 0, totalObjects);
         
-        // 座標系を統一（アートボード基準）
-        var prevCS = app.coordinateSystem;
-        app.coordinateSystem = CoordinateSystem.ARTBOARDCOORDINATESYSTEM;
-        
-        try {
-            executeImpositionWithCoordinates(doc, selection, rows, cols, spacing, paperSize, centerAlign, addTrimMarks);
-        } finally {
-            app.coordinateSystem = prevCS;
+        // 選択オブジェクトをグループ化（複数選択対応）
+        var originalGroup;
+        if (selection.length === 1) {
+            originalGroup = selection[0];
+        } else {
+            originalGroup = doc.groupItems.add();
+            for (var i = selection.length - 1; i >= 0; i--) {
+                selection[i].move(originalGroup, ElementPlacement.PLACEATBEGINNING);
+            }
         }
+
+        // 正確なbounds取得（Illustratorの座標系考慮）
+        var bounds = originalGroup.geometricBounds; // [left, top, right, bottom]
+        var objWidth = Math.abs(bounds[2] - bounds[0]);   // right - left
+        var objHeight = Math.abs(bounds[1] - bounds[3]);  // top - bottom
+
+        // 単位をポイントに変換（1mm = 2.834645669 pt）
+        var spacingPt = spacing * 2.834645669;
+        var paperWidthPt = paperSize.width * 2.834645669;
+        var paperHeightPt = paperSize.height * 2.834645669;
+
+        // 配置可能チェック
+        var totalWidth = (cols * objWidth) + ((cols - 1) * spacingPt);
+        var totalHeight = (rows * objHeight) + ((rows - 1) * spacingPt);
+        
+        if (totalWidth > paperWidthPt || totalHeight > paperHeightPt) {
+            hideProgress();
+            var overMsg = "警告: 面付け結果が用紙サイズを超過します。\n";
+            overMsg += "必要サイズ: " + Math.round(totalWidth/2.834645669) + "×" + Math.round(totalHeight/2.834645669) + "mm\n";
+            overMsg += "用紙サイズ: " + paperSize.width + "×" + paperSize.height + "mm\n";
+            overMsg += "\n続行しますか？";
+            if (!confirm(overMsg)) return;
+        }
+
+        // 開始位置計算（Illustrator座標系: Y軸は上が正）
+        var startX = bounds[0]; // 元の左端位置
+        var startY = bounds[1]; // 元の上端位置
+        
+        if (centerAlign) {
+            startX = (paperWidthPt - totalWidth) / 2;
+            startY = (paperHeightPt + totalHeight) / 2; // Y軸反転考慮
+        }
+
+        var processedCount = 1; // 元のオブジェクト分
+        
+        // 面付け実行（効率化）
+        for (var row = 0; row < rows; row++) {
+            for (var col = 0; col < cols; col++) {
+                if (row === 0 && col === 0) {
+                    // 元のオブジェクトを移動
+                    var deltaX = startX - bounds[0];
+                    var deltaY = startY - bounds[1];
+                    if (deltaX !== 0 || deltaY !== 0) {
+                        originalGroup.translate(deltaX, deltaY);
+                    }
+                } else {
+                    // 複製作成
+                    var duplicate = originalGroup.duplicate();
+                    
+                    var newX = startX + (col * (objWidth + spacingPt));
+                    var newY = startY - (row * (objHeight + spacingPt)); // Y軸下向きに配置
+                    
+                    var deltaX = newX - bounds[0];
+                    var deltaY = newY - bounds[1];
+                    duplicate.translate(deltaX, deltaY);
+                }
+                
+                updateProgress(processedCount++, totalObjects);
+            }
+        }
+
+        // トンボ追加
+        if (addTrimMarks) {
+            updateProgress(totalObjects, totalObjects, "トンボ作成中...");
+            createProfessionalTrimMarks(doc, paperWidthPt, paperHeightPt);
+        }
+
+        hideProgress();
+        
+        var completeMsg = "面付けが完了しました！♡\n";
+        completeMsg += "- " + rows + "行 × " + cols + "列 (" + totalObjects + "個)\n";
+        completeMsg += "- 用紙: " + paperSize.width + "×" + paperSize.height + "mm";
+        if (addTrimMarks) completeMsg += "\n- トンボ追加済み";
+        alert(completeMsg);
         
     } catch(e) {
+        hideProgress();
         var errorMsg = "面付け処理中にエラーが発生しました:\n";
-        errorMsg += "エラー内容: " + e.message + "\n\n";
+        errorMsg += "エラー内容: " + e.message + "\n";
+        errorMsg += "エラー行: " + (e.line || "不明") + "\n";
+        errorMsg += "ファイル: " + (e.fileName || "自動面付け.jsx") + "\n\n";
         errorMsg += "解決方法:\n";
         errorMsg += "1. オブジェクトが正しく選択されているか確認\n";
         errorMsg += "2. 用紙サイズ設定を確認\n";
         errorMsg += "3. Ctrl+Zで取り消し可能\n\n";
         errorMsg += "問題が続く場合は開発者にお知らせください♡";
         alert(errorMsg);
-        return false;
     }
 }
 
-// 座標系統一後のコア処理
-function executeImpositionWithCoordinates(doc, selection, rows, cols, spacing, paperSize, centerAlign, addTrimMarks) {
-    var totalObjects = rows * cols;
-    
-    // 選択オブジェクトをグループ化（複数選択対応）
-    var originalGroup;
-    if (selection.length === 1) {
-        originalGroup = selection[0];
-    } else {
-        originalGroup = doc.groupItems.add();
-        for (var i = selection.length - 1; i >= 0; i--) {
-            selection[i].move(originalGroup, ElementPlacement.PLACEATBEGINNING);
-        }
-    }    // アートボード基準のセンタリング計算（座標系統一済み）
-    var bounds = originalGroup.geometricBounds; // [left, top, right, bottom]
-    var objWidth = Math.abs(bounds[2] - bounds[0]);
-    var objHeight = Math.abs(bounds[1] - bounds[3]);
-    var spacingPt = spacing * 2.834645669;
-    
-    // 現在のアートボード取得
-    var abIdx = doc.artboards.getActiveArtboardIndex();
-    var abRect = doc.artboards[abIdx].artboardRect; // [L,T,R,B]
-    var abWidth = abRect[2] - abRect[0];
-    var abHeight = abRect[1] - abRect[3]; // top - bottom
-    
-    var totalWidth = (cols * objWidth) + ((cols - 1) * spacingPt);
-    var totalHeight = (rows * objHeight) + ((rows - 1) * spacingPt);
-    
-    // 用紙サイズチェック（アートボード基準）
-    var paperWidthPt = paperSize.width * 2.834645669;
-    var paperHeightPt = paperSize.height * 2.834645669;
-
-    if (totalWidth > paperWidthPt || totalHeight > paperHeightPt) {
-        var overMsg = "警告: 面付け結果が用紙サイズを超過します。\n";
-        overMsg += "必要サイズ: " + Math.round(totalWidth/2.834645669) + "×" + Math.round(totalHeight/2.834645669) + "mm\n";
-        overMsg += "用紙サイズ: " + paperSize.width + "×" + paperSize.height + "mm\n";
-        overMsg += "\n続行しますか？";
-        if (!confirm(overMsg)) return false;
-    }
-
-    // 面付け全体の配置開始位置（アートボード中央に配置するか、元位置基準か）
-    var startX, startY;
-    if (centerAlign) {
-        startX = abRect[0] + (abWidth - totalWidth) / 2;
-        startY = abRect[1] - (abHeight - totalHeight) / 2; // Y軸方向は上が正
-    } else {
-        startX = bounds[0];
-        startY = bounds[1];
-    }
-
-    $.writeln("Grid origin: (" + Math.round(startX) + ", " + Math.round(startY) + ")");
-
-    // 1. 必要数の複製を作成
-    var allObjects = [originalGroup]; // 元オブジェクトを含める
-    for (var i = 1; i < totalObjects; i++) {
-        try {
-            var duplicate = originalGroup.duplicate();
-            if (duplicate) {
-                allObjects.push(duplicate);
-            }
-        } catch(e) {
-            alert("複製エラー（" + i + "個目）: " + e.message);
-            break;
-        }
-    }
-
-    // 2. 全オブジェクトを一時グループに統合
-    var tempGroup = doc.groupItems.add();
-    for (var j = 0; j < allObjects.length; j++) {
-        allObjects[j].move(tempGroup, ElementPlacement.PLACEATBEGINNING);
-    }
-
-    // 3. 整列処理で配置（開始位置を渡す）
-    if (!distributeObjectsInGrid(tempGroup, rows, cols, spacing, startX, startY)) {
-        alert("整列処理でエラーが発生しました");
-        return false;
-    }
-
-    // 4. 安全なグループ解除
-    ungroupSafe(tempGroup);
-
-    // トンボ追加（Illustrator標準機能使用）
-    if (addTrimMarks) {
-        try {
-            // 全体を選択してからトリムマーク実行
-            app.executeMenuCommand("selectall");
-            app.executeMenuCommand("TrimMark Object");
-            doc.selection = null; // 選択解除
-            $.writeln("標準トリムマーク機能でトンボを追加しました");
-        } catch(trimError) {
-            // 標準機能が使えない場合は自前のトンボ作成
-            $.writeln("標準トリムマーク機能が使用できません。カスタムトンボを作成します。");
-            createProfessionalTrimMarks(doc, paperWidthPt, paperHeightPt);
-        }
-    }
-
-    var completeMsg = "面付けが完了しました！\n";
-    completeMsg += "- " + rows + "行 × " + cols + "列 (" + totalObjects + "個)\n";
-    completeMsg += "- 用紙: " + paperSize.width + "×" + paperSize.height + "mm";
-    if (addTrimMarks) completeMsg += "\n- トンボ追加済み";
-    alert(completeMsg);
-
-    return true; // 処理成功
-}
-
-// プログレスバー表示関数
+// プログレスバー表示関数（エラーハンドリング強化版）
 function showProgress(message, current, total) {
-    if (progressWindow) progressWindow.close();
-    
-    progressWindow = new Window("dialog", "処理中");
-    progressWindow.orientation = "column";
-    progressWindow.alignChildren = "fill";
-    progressWindow.spacing = 10;
-    progressWindow.margins = 16;
-    
-    var msgLabel = progressWindow.add("statictext", undefined, message);
-    msgLabel.alignment = "center";
-    
-    var progressBar = progressWindow.add("progressbar", undefined, current, total);
-    progressBar.preferredSize.width = 300;
-    
-    var statusLabel = progressWindow.add("statictext", undefined, current + " / " + total);
-    statusLabel.alignment = "center";
-    
-    progressWindow.show();
-    progressWindow.update();
+    try {
+        if (progressWindow) progressWindow.close();
+        
+        progressWindow = new Window("dialog", "処理中");
+        progressWindow.orientation = "column";
+        progressWindow.alignChildren = "fill";
+        progressWindow.spacing = 10;
+        progressWindow.margins = 16;
+        
+        var msgLabel = progressWindow.add("statictext", undefined, message);
+        msgLabel.alignment = "center";
+        
+        var progressBar = progressWindow.add("progressbar", undefined, current, total);
+        progressBar.preferredSize.width = 300;
+        
+        var statusLabel = progressWindow.add("statictext", undefined, current + " / " + total);
+        statusLabel.alignment = "center";
+        
+        progressWindow.show();
+        progressWindow.update();
+    } catch(e) {
+        // プログレス表示エラーの場合はコンソール出力のみ
+        try {
+            $.writeln("Progress: " + message + " (" + current + "/" + total + ")");
+        } catch(ee) {
+            // 完全に無視
+        }
+    }
 }
 
 function updateProgress(current, total, message) {
-    if (!progressWindow) return;
-    
     try {
-        if (message) progressWindow.children[0].text = message;
-        progressWindow.children[1].value = current;
-        progressWindow.children[2].text = current + " / " + total;
+        if (!progressWindow) return;
+        
+        if (message && progressWindow.children.length > 0) {
+            progressWindow.children[0].text = message;
+        }
+        if (progressWindow.children.length > 1) {
+            progressWindow.children[1].value = current;
+        }
+        if (progressWindow.children.length > 2) {
+            progressWindow.children[2].text = current + " / " + total;
+        }
         progressWindow.update();
     } catch(e) {
-        // プログレス更新エラーは無視
+        // プログレス更新エラーは無視してコンソール出力
+        try {
+            $.writeln("Progress Update: " + (message || "") + " (" + current + "/" + total + ")");
+        } catch(ee) {
+            // 完全に無視
+        }
     }
 }
 
 function hideProgress() {
-    if (progressWindow) {
-        progressWindow.close();
+    try {
+        if (progressWindow) {
+            progressWindow.close();
+            progressWindow = null;
+        }
+    } catch(e) {
+        // プログレス非表示エラーは無視
         progressWindow = null;
     }
 }
@@ -444,19 +442,9 @@ function createProfessionalTrimMarks(doc, width, height) {
         var strokeWidth = 0.25;  // 0.1mm
         
         // 色設定（レジストレーションカラー）
-        var regColor;
-        try {
-            var regSpot = doc.spots.getByName("[Registration]");
-            var sc = new SpotColor();
-            sc.spot = regSpot;
-            sc.tint = 100;
-            regColor = sc;
-        } catch (e) {
-            // フォールバック: 100% K（万一[Registration]が取得できない場合）
-            var black = new GrayColor();
-            black.gray = 100;
-            regColor = black;
-        }
+        var trimColor = doc.spots.add();
+        trimColor.name = "トンボ";
+        trimColor.color.spot.colorType = ColorModel.REGISTRATION;
         
         // 四隅のコーナートンボ
         var corners = [
@@ -476,7 +464,7 @@ function createProfessionalTrimMarks(doc, width, height) {
                 [corner.x + trimLength, corner.y]
             ]);
             hLine.strokeWidth = strokeWidth;
-            hLine.strokeColor = regColor;
+            hLine.strokeColor = trimColor.color;
             hLine.filled = false;
             hLine.move(trimGroup, ElementPlacement.PLACEATBEGINNING);
             
@@ -487,7 +475,7 @@ function createProfessionalTrimMarks(doc, width, height) {
                 [corner.x, corner.y + trimLength]
             ]);
             vLine.strokeWidth = strokeWidth;
-            vLine.strokeColor = regColor;
+            vLine.strokeColor = trimColor.color;
             vLine.filled = false;
             vLine.move(trimGroup, ElementPlacement.PLACEATBEGINNING);
         }
@@ -517,7 +505,7 @@ function createProfessionalTrimMarks(doc, width, height) {
                 ]);
             }
             centerLine.strokeWidth = strokeWidth;
-            centerLine.strokeColor = regColor;
+            centerLine.strokeColor = trimColor.color;
             centerLine.filled = false;
             centerLine.move(trimGroup, ElementPlacement.PLACEATBEGINNING);
         }
@@ -548,107 +536,13 @@ function initializeSettings(rowInput, colInput, spacingInput, paperDropdown, wid
     }
 }
 
-// メイン実行関数
-function main() {
-    try {
-        if (!app.activeDocument) {
-            alert("Illustratorでドキュメントを開いてからスクリプトを実行してください。");
-            return "ドキュメントが開かれていません";
-        } else {
-            createImpositionGUI();
-            return "面付けツールを起動しました";
-        }
-    } catch(e) {
-        alert("スクリプト起動エラー: " + e.message);
-        return "エラー: " + e.message;
-    }
-}
-
-// 安全なグループ解除関数
-function ungroupSafe(groupItem) {
-    try {
-        if (!groupItem || groupItem.typename !== "GroupItem") {
-            $.writeln("警告: 無効なグループアイテムです");
-            return false;
-        }
-        
-        var parent = groupItem.parent;
-        var items = [];
-        
-        // 逆順でアイテムを取得（安全性向上）
-        for (var i = groupItem.pageItems.length - 1; i >= 0; i--) {
-            items.push(groupItem.pageItems[i]);
-        }
-        
-        // 各アイテムを親に移動
-        for (var j = 0; j < items.length; j++) {
-            items[j].move(parent, ElementPlacement.PLACEATBEGINNING);
-        }
-        
-        // 空になったグループを削除
-        groupItem.remove();
-        $.writeln("グループ解除完了: " + items.length + "個のアイテムを移動");
-        return true;
-        
-    } catch(e) {
-        alert("グループ解除エラー: " + e.message);
-        return false;
-    }
-}
-
-// 新しい整列ベースの面付け関数（リファクタリング版）
-function distributeObjectsInGrid(groupOrArray, rows, cols, spacingMM, startLeft, startTop) {
-    try {
-        var spacingPt = spacingMM * 2.834645669; // mm to point
-        
-        // グループの場合はpageItemsから取得、配列の場合はそのまま使用
-        var allObjects;
-        if (groupOrArray.typename === "GroupItem") {
-            allObjects = [];
-            for (var i = 0; i < groupOrArray.pageItems.length; i++) {
-                allObjects.push(groupOrArray.pageItems[i]);
-            }
-        } else if (groupOrArray.length !== undefined) {
-            allObjects = groupOrArray;
-        } else {
-            alert("無効なオブジェクト型です");
-            return false;
-        }
-        
-        if (!allObjects || allObjects.length === 0) {
-            alert("整列対象のオブジェクトがありません");
-            return false;
-        }
-        
-        // オブジェクトサイズ取得（最初のオブジェクトベース）
-        var firstBounds = allObjects[0].geometricBounds;
-        var objWidth = Math.abs(firstBounds[2] - firstBounds[0]);
-        var objHeight = Math.abs(firstBounds[1] - firstBounds[3]);
-        
-        // 基準位置（指定があればそれを使用、なければ最初のオブジェクト位置）
-        var originLeft = (startLeft !== undefined) ? startLeft : firstBounds[0];
-        var originTop = (startTop !== undefined) ? startTop : firstBounds[1];
-        
-        // グリッド配置実行（最初のオブジェクトも含めて移動）
-        var objIndex = 0;
-        for (var row = 0; row < rows && objIndex < allObjects.length; row++) {
-            for (var col = 0; col < cols && objIndex < allObjects.length; col++) {
-                var targetX = originLeft + (col * (objWidth + spacingPt));
-                var targetY = originTop - (row * (objHeight + spacingPt));
-                var currentBounds = allObjects[objIndex].geometricBounds;
-                var deltaX = targetX - currentBounds[0];
-                var deltaY = targetY - currentBounds[1];
-                allObjects[objIndex].translate(deltaX, deltaY);
-                objIndex++;
-            }
-        }
-        
-        return true;
-    } catch(e) {
-        alert("整列エラー: " + e.message);
-        return false;
-    }
-}
-
 // スクリプト実行
-main();
+try {
+    if (!app.activeDocument) {
+        alert("Illustratorでドキュメントを開いてからスクリプトを実行してください。");
+    } else {
+        createImpositionGUI();
+    }
+} catch(e) {
+    alert("スクリプト起動エラー: " + e.message);
+}
