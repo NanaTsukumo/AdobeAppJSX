@@ -103,12 +103,22 @@ checkbox.value = true;
 ## Best Practices
 
 ### Code Organization
+
 1. Separate UI creation from business logic
 2. Use meaningful function and variable names
 3. Add comprehensive error checking
 4. Include usage examples in comments
 
+### File Naming Conventions
+
+1. **Use English filenames for all script files** (e.g., `auto-imposition.jsx`, not `自動面付け.jsx`)
+2. Use kebab-case for multi-word filenames (e.g., `batch-export.jsx`)
+3. Include clear descriptive names indicating functionality
+4. Avoid special characters and spaces in filenames
+5. Use `.jsx` extension for ExtendScript files
+
 ### User Experience
+
 1. Validate inputs before processing
 2. Provide clear progress indication
 3. Include cancel functionality
