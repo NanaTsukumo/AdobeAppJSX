@@ -1,0 +1,58 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "📋 JSX Development Checklist",
+      "type": "shell",
+      "command": "code",
+      "args": ["${workspaceFolder}/References/Quick-Reference-JSX-Snippets.md"],
+      "group": "build",
+      "presentation": {
+        "echo": false,
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared"
+      },
+      "problemMatcher": [],
+      "detail": "Open JSX development checklist and references"
+    },
+    {
+      "label": "🔗 Open Adobe Documentation",
+      "type": "shell", 
+      "command": "code",
+      "args": ["${workspaceFolder}/References/Adobe-JSX-Documentation-Index.md"],
+      "group": "build",
+      "presentation": {
+        "echo": false,
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared"
+      },
+      "problemMatcher": [],
+      "detail": "Open Adobe JSX official documentation index"
+    },
+    {
+      "label": "🚀 Create New JSX Script",
+      "type": "shell",
+      "command": "code",
+      "args": ["${workspaceFolder}/illustrator Scripts/new-script-${input:scriptName}.jsx"],
+      "group": "build",
+      "presentation": {
+        "echo": false,
+        "reveal": "silent",
+        "focus": true,
+        "panel": "shared"
+      },
+      "problemMatcher": [],
+      "detail": "Create new JSX script with template"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "scriptName",
+      "description": "Enter script name",
+      "default": "untitled",
+      "type": "promptString"
+    }
+  ]
+}

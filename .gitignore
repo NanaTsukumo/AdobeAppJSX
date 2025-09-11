@@ -57,13 +57,28 @@ user_config.jsx
 # 内部資料（非公開）
 ROADMAP_INTERNAL.md
 PRIVATE_*.md
+NOTES_INTERNAL.md
+TODO_PERSONAL.md
 internal/
 confidential/
+private/
 
 # VS Code 個人設定（プロジェクト設定は残す）
 .vscode/settings.json
+.vscode/settings.local.json
 # .vscode/launch.json  # プロジェクト共有用なのでコメントアウト
 .vscode/*.log
+
+# Adobe専用設定ファイル（個人環境依存）
+.vscode/illustrator.settings.json
+.vscode/indesign.settings.json
+.vscode/photoshop.settings.json
+
+# テーマファイル（個人好み）
+.vscode/*-theme.json
+.vscode/illustrator-theme.json
+.vscode/indesign-theme.json
+.vscode/photoshop-theme.json
 
 # ノード関連（もし将来使う場合）
 node_modules/
@@ -76,6 +91,8 @@ work/
 draft/
 archive/
 backup_*/
+personal/
+experiments/
 
 # Windows関連
 *.lnk

@@ -30,6 +30,8 @@ Adobe Creative Suite向けの実用的なExtendScriptコレクション。コミ
   - ⚠️ **Alpha版**: 大量データ・複雑レイアウトで要検証
 
 > **今後の追加予定**: Photoshop、InDesign向けスクリプトも順次追加予定
+> 
+> 📋 **詳細な開発計画**: [`SystemPrompts/Adobe/script-development-roadmap.md`](SystemPrompts/Adobe/script-development-roadmap.md)
 
 ## 🚀 特徴
 
