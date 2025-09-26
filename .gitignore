@@ -94,6 +94,11 @@ backup_*/
 personal/
 experiments/
 
+# 外部資料・参考文書（プライベート）
+External-Resources/
+external-docs/
+reference-materials/
+
 # Windows関連
 *.lnk
 *.exe
