@@ -1,7 +1,7 @@
 # 📋 Illustrator レイヤー整理ツール 要件定義書
 
 > **プロジェクト名**: AI Layer Organizer for Illustrator
-> **バージョン**: 1.0.0-alpha.1
+> **バージョン**: 0.1.0-alpha.1
 > **作成日**: 2025年9月11日
 > **要件定義者**: GitHub copilot(月代観るな (Luna Tsukuyomi)) / Codex / NanaTsukumo
 > **実装担当者**: 月代観るな (Luna Tsukuyomi)

@@ -2,7 +2,7 @@
  * AI Layer Organizer for Illustrator
  * レイヤー自動整理ツール
  * 
- * @version 1.0.0-alpha.1
+ * @version 0.1.0-alpha.1
  * @author 月代観るな (Luna Tsukuyomi)
  * @license Apache-2.0
  * @description Illustratorのレイヤー構造を自動で整理・最適化するスクリプト
@@ -15,7 +15,7 @@
  */
 
 // グローバル変数とデバッグ設定
-var SCRIPT_VERSION = "1.0.0-alpha.1";
+var SCRIPT_VERSION = "0.1.0-alpha.1";
 var DEBUG_MODE = true;
 var PROGRESS_WINDOW = null;
 var CANCEL_REQUESTED = false;
