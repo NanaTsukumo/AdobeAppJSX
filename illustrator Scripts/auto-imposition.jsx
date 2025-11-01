@@ -1,7 +1,18 @@
+// ========================================
+// ファイル: auto-imposition.jsx
+// 目的: 複数ドキュメントの自動面付け処理
+// 対応: Adobe Illustrator CC 2020以降
+// 参照: References/Adobe-JSX-Documentation-Index.md
+// ========================================
+
 /**
  * Illustrator面付け自動化スクリプト
  * 
- * @version 0.1.0-alpha.1
+ * 印刷業界標準の面付けレイアウトを自動生成するツール。
+ * 複数の仕上がりサイズを親紙上に効率的に配置し、
+ * トンボ・裁ち落とし・ドブ幅を自動設定。
+ * 
+ * @version 0.2.0-alpha.1
  * @author 月代観るな (Luna Tsukuyomi)  
  * @license Apache-2.0
  * @description Adobe Illustrator向けの面付け自動化ツール（開発版）
@@ -11,12 +22,15 @@
  * @status Alpha - 実験的機能、破壊的変更の可能性あり
  */
 
-// グローバル変数
-var SCRIPT_VERSION = "0.2.0-alpha.1";
-var PREFERENCES_KEY = "ImpositionScript";
-var progressWindow = null;
+// === グローバル変数 ===
+var SCRIPT_VERSION = "0.2.0-alpha.1";  // スクリプトバージョン
+var PREFERENCES_KEY = "ImpositionScript";  // 設定保存用キー
+var progressWindow = null;  // プログレスバー表示用ウィンドウ
 
-// 印刷業界標準定義
+// === 印刷業界標準定義 ===
+
+// 面付けプリセット定義
+// 1up, 2up, 4up などの標準的な面付けパターンを提供
 var IMPOSITION_PRESETS = [
     {text: "1up", rows: 1, cols: 1, description: "1面付け（単体配置）"},
     {text: "2up", rows: 1, cols: 2, description: "2面付け（2つ並び）"},
@@ -26,6 +40,8 @@ var IMPOSITION_PRESETS = [
     {text: "カスタム", custom: true, description: "任意の配置"}
 ];
 
+// 仕上がりサイズ定義
+// 一般的な印刷物の標準サイズを mm 単位で定義
 var FINISHED_SIZES = [
     {text: "名刺 (91×55mm)", width: 91, height: 55},
     {text: "ハガキ (100×148mm)", width: 100, height: 148},
@@ -36,6 +52,8 @@ var FINISHED_SIZES = [
     {text: "カスタム", custom: true}
 ];
 
+// 親紙サイズ定義
+// 実際に印刷機で使用する用紙サイズを mm 単位で定義
 var PARENT_PAPER_SIZES = [
     {text: "A3 (297×420mm)", width: 297, height: 420},
     {text: "A2 (420×594mm)", width: 420, height: 594},
@@ -46,6 +64,8 @@ var PARENT_PAPER_SIZES = [
     {text: "カスタム", custom: true}
 ];
 
+// 面付け方向定義
+// 印刷物の配置順序と向きを定義
 var IMPOSITION_ORIENTATIONS = [
     {text: "左→右、上→下 (標準)", direction: "ltr-ttb"},
     {text: "右→左、上→下 (右綴じ)", direction: "rtl-ttb"},
@@ -53,6 +73,8 @@ var IMPOSITION_ORIENTATIONS = [
     {text: "天地逆転面付け", direction: "inverted"}
 ];
 
+// 折り加工タイプ定義
+// 印刷後の折り加工方法を定義
 var FOLDING_TYPES = [
     {text: "なし", type: "none"},
     {text: "二つ折り", type: "half"},
@@ -63,6 +85,7 @@ var FOLDING_TYPES = [
 ];
 
 // 印刷業界標準値
+// 裁ち落とし幅やドブ幅の推奨値を定義
 var PRINTING_STANDARDS = {
     minBleed: 3,        // 最小裁ち落とし幅（mm）
     recommendedBleed: 3, // 推奨裁ち落とし幅（mm）
@@ -71,8 +94,18 @@ var PRINTING_STANDARDS = {
     minEfficiency: 70   // 最小用紙効率（%）
 };
 
+/**
+ * 面付け設定用 GUI ダイアログを作成
+ * 
+ * ScriptUI の Window オブジェクトを使用してタブ形式のダイアログを構築。
+ * 基本設定、詳細設定、プレビューの3タブで構成され、各種設定を直感的に操作できる。
+ * sharedData オブジェクトでタブ間のデータ共有を実現。
+ * 
+ * @returns {Window} ScriptUI のダイアログウィンドウオブジェクト
+ */
 function createImpositionGUI() {
-    // プロ仕様ダイアログウィンドウを作成
+    // ダイアログウィンドウの作成
+    // Window コンストラクタで dialog タイプのウィンドウを作成
     var dialog = new Window("dialog", "面付け自動化ツール Pro v" + SCRIPT_VERSION);
     dialog.orientation = "column";
     dialog.alignChildren = "fill";
@@ -81,19 +114,22 @@ function createImpositionGUI() {
     dialog.preferredSize.width = 520;
     dialog.preferredSize.height = 480;
 
-    // メインタブパネル
+    // メインタブパネルの作成
+    // tabbedpanel により複数のタブを切り替え表示
     var tabPanel = dialog.add("tabbedpanel");
     tabPanel.alignChildren = "fill";
     tabPanel.preferredSize.height = 380;
 
     // タブ1: 基本設定
+    // 面付けプリセット、仕上がりサイズ、親紙サイズの選択
     var basicTab = tabPanel.add("tab", undefined, "基本設定");
     basicTab.orientation = "column";
     basicTab.alignChildren = "fill";
     basicTab.spacing = 8;
     basicTab.margins = 10;
 
-    // タブ2: 詳細設定  
+    // タブ2: 詳細設定
+    // 裁ち落とし、ドブ幅、折り加工などの詳細パラメータ設定
     var advancedTab = tabPanel.add("tab", undefined, "詳細設定");
     advancedTab.orientation = "column";
     advancedTab.alignChildren = "fill";
@@ -101,13 +137,15 @@ function createImpositionGUI() {
     advancedTab.margins = 10;
 
     // タブ3: プレビュー
+    // 設定内容の確認とレイアウトプレビュー表示
     var previewTab = tabPanel.add("tab", undefined, "プレビュー");
     previewTab.orientation = "column";
     previewTab.alignChildren = "fill";
     previewTab.spacing = 8;
     previewTab.margins = 10;
 
-    // 共有データオブジェクト（タブ間でデータ共有）
+    // タブ間データ共有オブジェクト
+    // 各タブの UI コンポーネントがこのオブジェクトを参照・更新することで設定値を共有
     var sharedData = {
         preset: {rows: 1, cols: 2}, // デフォルト2up
         finishedSize: {width: 210, height: 297}, // A4
@@ -121,13 +159,16 @@ function createImpositionGUI() {
     };
 
     // ========== 基本設定タブの内容 ==========
-    // 面付けプリセット
+    
+    // 面付けプリセット選択パネル
+    // 1up, 2up, 4up などのボタンで標準的な面付けパターンを選択
     var impositionPanel = basicTab.add("panel", undefined, "面付けプリセット");
     impositionPanel.orientation = "column";
     impositionPanel.alignChildren = "fill";
     impositionPanel.spacing = 5;
     impositionPanel.margins = 8;
 
+    // プリセットボタンの横並びグループ
     var presetButtonGroup = impositionPanel.add("group");
     presetButtonGroup.orientation = "row";
     presetButtonGroup.spacing = 5;
@@ -135,6 +176,8 @@ function createImpositionGUI() {
     var presetButtons = [];
     var selectedPreset = null;
     
+    // IMPOSITION_PRESETS 配列からボタンを動的生成
+    // 各プリセットに対応するボタンを作成し、onClick イベントを設定
     for (var i = 0; i < IMPOSITION_PRESETS.length; i++) {
         var btn = presetButtonGroup.add("button", undefined, IMPOSITION_PRESETS[i].text);
         btn.preferredSize.width = 70;
@@ -143,22 +186,26 @@ function createImpositionGUI() {
         btn.index = i;
         presetButtons.push(btn);
         
-        // デフォルトで2upを選択
+        // デフォルト選択状態の設定
+        // 2up プリセットを初期選択として「●」マークを追加
         if (IMPOSITION_PRESETS[i].text === "2up") {
             selectedPreset = btn;
             btn.text = "● " + btn.text;
         }
         
+        // プリセットボタンのクリックイベント
+        // 選択状態の切り替えと sharedData の更新を実行
         btn.onClick = function() {
-            // 全ボタンの選択解除
+            // 全ボタンの選択マークをクリア
             for (var j = 0; j < presetButtons.length; j++) {
                 presetButtons[j].text = presetButtons[j].preset.text;
             }
-            // 選択ボタンをマーク
+            // クリックされたボタンに選択マークを追加
             this.text = "● " + this.preset.text;
             selectedPreset = this;
             
-            // 共有データ更新
+            // カスタムプリセットの判定
+            // custom プロパティが true の場合は行列入力フィールドを表示
             if (!this.preset.custom) {
                 sharedData.preset = {rows: this.preset.rows, cols: this.preset.cols};
                 rowInput.text = this.preset.rows.toString();
@@ -171,7 +218,8 @@ function createImpositionGUI() {
         };
     }
     
-    // カスタム面付け設定（初期は非表示）
+    // カスタム面付け設定グループ
+    // 「カスタム」ボタン選択時のみ表示され、任意の行列数を入力可能
     var customRowColGroup = impositionPanel.add("group");
     customRowColGroup.orientation = "row";
     customRowColGroup.spacing = 10;
@@ -184,7 +232,8 @@ function createImpositionGUI() {
     var colInput = customRowColGroup.add("edittext", undefined, "2");
     colInput.characters = 4;
     
-    // 数値入力制限
+    // 数値入力の検証とデータ更新
+    // onChanging イベントで非数値文字の除去と最大値制限を実装
     rowInput.onChanging = function() {
         this.text = this.text.replace(/[^0-9]/g, "");
         if (parseInt(this.text) > 10) this.text = "10";
@@ -199,24 +248,28 @@ function createImpositionGUI() {
     };
 
     // 仕上がりサイズ設定
+    // 仕上がりサイズ設定パネル
+    // 実際の印刷物の最終サイズを指定（名刺、ハガキ、A4 など）
     var finishedSizePanel = basicTab.add("panel", undefined, "仕上がりサイズ（実際の印刷物サイズ）");
     finishedSizePanel.orientation = "column";
     finishedSizePanel.alignChildren = "fill";
     finishedSizePanel.spacing = 5;
     finishedSizePanel.margins = 8;
 
+    // ドロップダウンリストの作成
+    // FINISHED_SIZES 配列から選択肢を動的生成
     var finishedSizeGroup = finishedSizePanel.add("group");
     finishedSizeGroup.add("statictext", undefined, "サイズ:");
     var finishedDropdown = finishedSizeGroup.add("dropdownlist");
     finishedDropdown.preferredSize.width = 200;
     
-    // 仕上がりサイズの選択肢を追加
     for (var k = 0; k < FINISHED_SIZES.length; k++) {
         finishedDropdown.add("item", FINISHED_SIZES[k].text);
     }
     finishedDropdown.selection = 2; // A4をデフォルト
 
-    // カスタム仕上がりサイズ（初期は非表示）
+    // カスタムサイズ入力フィールド
+    // 「カスタム」選択時のみ表示され、任意の幅・高さを mm 単位で指定
     var customFinishedGroup = finishedSizePanel.add("group");
     customFinishedGroup.spacing = 8;
     customFinishedGroup.visible = false;
@@ -227,7 +280,8 @@ function createImpositionGUI() {
     var finishedHeightInput = customFinishedGroup.add("edittext", undefined, "297");
     finishedHeightInput.characters = 6;
 
-    // 仕上がりサイズ変更時の処理
+    // 仕上がりサイズ変更イベント
+    // カスタムサイズの表示切り替えと sharedData の更新を実行
     finishedDropdown.onChange = function() {
         var isCustom = (this.selection.index === FINISHED_SIZES.length - 1);
         customFinishedGroup.visible = isCustom;
@@ -239,25 +293,28 @@ function createImpositionGUI() {
         updatePreviewInfo();
     };
 
-    // 親紙サイズ設定
+    // 親紙サイズ設定パネル
+    // 印刷機で実際に使用する用紙サイズを指定（A3、A2、菊全判など）
     var parentSizePanel = basicTab.add("panel", undefined, "親紙サイズ（実際に印刷する用紙）");
     parentSizePanel.orientation = "column";
     parentSizePanel.alignChildren = "fill";
     parentSizePanel.spacing = 5;
     parentSizePanel.margins = 8;
 
+    // ドロップダウンリストの作成
+    // PARENT_PAPER_SIZES 配列から選択肢を動的生成
     var parentSizeGroup = parentSizePanel.add("group");
     parentSizeGroup.add("statictext", undefined, "用紙:");
     var parentDropdown = parentSizeGroup.add("dropdownlist");
     parentDropdown.preferredSize.width = 200;
     
-    // 親紙サイズの選択肢を追加
     for (var l = 0; l < PARENT_PAPER_SIZES.length; l++) {
         parentDropdown.add("item", PARENT_PAPER_SIZES[l].text);
     }
     parentDropdown.selection = 0; // A3をデフォルト
 
-    // カスタム親紙サイズ（初期は非表示）
+    // カスタムサイズ入力フィールド
+    // 「カスタム」選択時のみ表示され、任意の幅・高さを mm 単位で指定
     var customParentGroup = parentSizePanel.add("group");
     customParentGroup.spacing = 8;
     customParentGroup.visible = false;
@@ -268,7 +325,8 @@ function createImpositionGUI() {
     var parentHeightInput = customParentGroup.add("edittext", undefined, "420");
     parentHeightInput.characters = 6;
 
-    // 親紙サイズ変更時の処理
+    // 親紙サイズ変更イベント
+    // カスタムサイズの表示切り替えと sharedData の更新を実行
     parentDropdown.onChange = function() {
         var isCustom = (this.selection.index === PARENT_PAPER_SIZES.length - 1);
         customParentGroup.visible = isCustom;
@@ -281,7 +339,9 @@ function createImpositionGUI() {
     };
 
     // ========== 詳細設定タブの内容 ==========
-    // 裁ち落とし（ブリード）設定
+    
+    // 裁ち落とし（ブリード）設定パネル
+    // 印刷後の断裁時に白フチが出ないよう、仕上がりサイズより外側に描画する幅を指定
     var bleedPanel = advancedTab.add("panel", undefined, "裁ち落とし（ブリード）設定");
     bleedPanel.orientation = "column";
     bleedPanel.alignChildren = "fill";
@@ -294,9 +354,13 @@ function createImpositionGUI() {
     bleedInput.characters = 5;
     bleedGroup.add("statictext", undefined, "mm");
     
+    // 推奨値のヒント表示
+    // 印刷業界では 3mm が標準的な裁ち落とし幅
     var bleedHint = bleedPanel.add("statictext", undefined, "推奨: 3mm（印刷業界標準）");
     bleedHint.graphics.foregroundColor = bleedHint.graphics.newPen(bleedHint.graphics.PenType.SOLID_COLOR, [0.5, 0.5, 0.5], 1);
     
+    // 数値入力の検証
+    // 非数値文字の除去と上限値（20mm）の制限を実装
     bleedInput.onChanging = function() {
         this.text = this.text.replace(/[^0-9.]/g, "");
         var value = parseFloat(this.text) || 0;
@@ -305,7 +369,8 @@ function createImpositionGUI() {
         updatePreviewInfo();
     };
 
-    // ドブ（溝幅）設定
+    // ドブ（溝幅）設定パネル
+    // 面付けされた各印刷物の間に設ける余白（断裁時の安全マージン）
     var gutterPanel = advancedTab.add("panel", undefined, "ドブ（溝幅）設定");
     gutterPanel.orientation = "column";
     gutterPanel.alignChildren = "fill";
@@ -318,9 +383,13 @@ function createImpositionGUI() {
     gutterInput.characters = 5;
     gutterGroup.add("statictext", undefined, "mm");
     
+    // 推奨値のヒント表示
+    // 6-10mm が一般的な安全マージン
     var gutterHint = gutterPanel.add("statictext", undefined, "推奨: 6-10mm（断裁時の安全マージン）");
     gutterHint.graphics.foregroundColor = gutterHint.graphics.newPen(gutterHint.graphics.PenType.SOLID_COLOR, [0.5, 0.5, 0.5], 1);
     
+    // 数値入力の検証
+    // 非数値文字の除去と上限値（50mm）の制限を実装
     gutterInput.onChanging = function() {
         this.text = this.text.replace(/[^0-9.]/g, "");
         var value = parseFloat(this.text) || 0;
@@ -329,13 +398,16 @@ function createImpositionGUI() {
         updatePreviewInfo();
     };
 
-    // 面付け方向・順序
+    // 面付け方向・順序設定パネル
+    // 印刷物を配置する順序と向きを指定（左から右、右から左、天地逆転など）
     var orientationPanel = advancedTab.add("panel", undefined, "面付け方向・順序");
     orientationPanel.orientation = "column";
     orientationPanel.alignChildren = "fill";
     orientationPanel.spacing = 5;
     orientationPanel.margins = 8;
 
+    // ドロップダウンリストの作成
+    // IMPOSITION_ORIENTATIONS 配列から選択肢を動的生成
     var orientationGroup = orientationPanel.add("group");
     orientationGroup.add("statictext", undefined, "配置順序:");
     var orientationDropdown = orientationGroup.add("dropdownlist");
@@ -346,6 +418,8 @@ function createImpositionGUI() {
     }
     orientationDropdown.selection = 0; // 標準をデフォルト
     
+    // 方向変更イベント
+    // 選択された配置順序を sharedData に反映
     orientationDropdown.onChange = function() {
         sharedData.orientation = IMPOSITION_ORIENTATIONS[this.selection.index].direction;
         updatePreviewInfo();
@@ -711,11 +785,27 @@ function executeImposition(rows, cols, spacing, paperSize, centerAlign, addTrimM
     }
 }
 
-// 座標系統一後のコア処理
+/**
+ * 座標系統一後の面付けコア処理
+ * 
+ * CoordinateSystem.ARTBOARDCOORDINATESYSTEM に統一された座標系で動作。
+ * アートボードの左上を原点として、オブジェクトの複製と配置を実行。
+ * geometricBounds を使用して正確な座標計算を実施。
+ * 
+ * @param {Document} doc - アクティブドキュメント
+ * @param {Array} selection - 選択中のオブジェクト配列
+ * @param {Number} rows - 行数
+ * @param {Number} cols - 列数
+ * @param {Number} spacing - オブジェクト間隔（mm）
+ * @param {Object} paperSize - 親紙サイズ {width, height} (mm)
+ * @param {Boolean} centerAlign - アートボード中央配置フラグ
+ * @param {Boolean} addTrimMarks - トンボ追加フラグ
+ */
 function executeImpositionWithCoordinates(doc, selection, rows, cols, spacing, paperSize, centerAlign, addTrimMarks) {
     var totalObjects = rows * cols;
     
-    // 選択オブジェクトをグループ化（複数選択対応）
+    // 選択オブジェクトのグループ化
+    // 複数オブジェクトが選択されている場合は groupItems.add() で統合
     var originalGroup;
     if (selection.length === 1) {
         originalGroup = selection[0];
@@ -724,22 +814,29 @@ function executeImpositionWithCoordinates(doc, selection, rows, cols, spacing, p
         for (var i = selection.length - 1; i >= 0; i--) {
             selection[i].move(originalGroup, ElementPlacement.PLACEATBEGINNING);
         }
-    }    // アートボード基準のセンタリング計算（座標系統一済み）
-    var bounds = originalGroup.geometricBounds; // [left, top, right, bottom]
+    }
+    
+    // アートボード基準のセンタリング計算
+    // geometricBounds は [left, top, right, bottom] の配列形式で座標を返す
+    var bounds = originalGroup.geometricBounds;
     var objWidth = Math.abs(bounds[2] - bounds[0]);
     var objHeight = Math.abs(bounds[1] - bounds[3]);
-    var spacingPt = spacing * 2.834645669;
+    var spacingPt = spacing * 2.834645669; // mm を pt に変換
     
-    // 現在のアートボード取得
+    // アクティブアートボードの取得
+    // artboardRect も [L, T, R, B] 形式で座標を返す
     var abIdx = doc.artboards.getActiveArtboardIndex();
-    var abRect = doc.artboards[abIdx].artboardRect; // [L,T,R,B]
+    var abRect = doc.artboards[abIdx].artboardRect;
     var abWidth = abRect[2] - abRect[0];
-    var abHeight = abRect[1] - abRect[3]; // top - bottom
+    var abHeight = abRect[1] - abRect[3]; // Y軸は上が正の値
     
+    // 面付け全体のサイズ計算
+    // オブジェクト幅 × 列数 + 間隔 × (列数 - 1)
     var totalWidth = (cols * objWidth) + ((cols - 1) * spacingPt);
     var totalHeight = (rows * objHeight) + ((rows - 1) * spacingPt);
     
-    // 用紙サイズチェック（アートボード基準）
+    // 用紙サイズ超過チェック
+    // mm を pt に変換して比較
     var paperWidthPt = paperSize.width * 2.834645669;
     var paperHeightPt = paperSize.height * 2.834645669;
 
@@ -751,11 +848,12 @@ function executeImpositionWithCoordinates(doc, selection, rows, cols, spacing, p
         if (!confirm(overMsg)) return false;
     }
 
-    // 面付け全体の配置開始位置（アートボード中央に配置するか、元位置基準か）
+    // 配置開始位置の計算
+    // centerAlign が true の場合はアートボード中央に配置
     var startX, startY;
     if (centerAlign) {
         startX = abRect[0] + (abWidth - totalWidth) / 2;
-        startY = abRect[1] - (abHeight - totalHeight) / 2; // Y軸方向は上が正
+        startY = abRect[1] - (abHeight - totalHeight) / 2;
     } else {
         startX = bounds[0];
         startY = bounds[1];
@@ -763,8 +861,9 @@ function executeImpositionWithCoordinates(doc, selection, rows, cols, spacing, p
 
     $.writeln("Grid origin: (" + Math.round(startX) + ", " + Math.round(startY) + ")");
 
-    // 1. 必要数の複製を作成
-    var allObjects = [originalGroup]; // 元オブジェクトを含める
+    // オブジェクトの複製生成
+    // duplicate() メソッドで元オブジェクトの完全なコピーを作成
+    var allObjects = [originalGroup];
     for (var i = 1; i < totalObjects; i++) {
         try {
             var duplicate = originalGroup.duplicate();
